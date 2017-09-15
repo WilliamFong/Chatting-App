@@ -7,3 +7,7 @@ TODO:
     Check if IP is working
         If not, find a way of getting the right IP Address
     ???
+
+To run:
+    javac ChatMain.java
+    java ChatMain <port number>
