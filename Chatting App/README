@@ -1,11 +1,10 @@
 Work in progress.
 TODO:
-    Figure out how to delete connection from connection array when disconnected
-    Find a better way of dealing with the connections
-    Add the connection to the server's connection array
-    Send the string through the socket
+    Figure out how to delete connection from peer list when disconnected
+    Send the message through the socket
     Check if IP is working
         If not, find a way of getting the right IP Address
+    Documentation
     ???
 
 To run:
