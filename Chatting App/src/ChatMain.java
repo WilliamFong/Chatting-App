@@ -4,11 +4,15 @@ import java.util.*;
 
 public class ChatMain extends Thread {
     private static ServerSocket theServer;
-    private static List<Socket> peers = new ArrayList<>();
+    public static List<Socket> peers = new ArrayList<>();
+    public static List<Integer> peerPorts = new ArrayList<>();
+    public static List<DataOutputStream> outputStreamers = new ArrayList<>();
+
     public ChatMain(int listeningport) throws IOException {
         theServer = new ServerSocket(listeningport);
         theServer.setSoTimeout(0);
     }
+
     /*
      *      Thread run method.
      *
@@ -19,26 +23,13 @@ public class ChatMain extends Thread {
         while (true) {
             try {
                 Socket server = theServer.accept();
-                server.setSoTimeout(0);
-                System.out.println("Connection detected from... " + server.getRemoteSocketAddress());
-                // DEBUG
-                System.out.println("server addr: " + server.getInetAddress().getHostAddress() + " : port: " + server.getPort() );
-                peers.add(server);
-                try {
-                    DataInputStream in = new DataInputStream(server.getInputStream());
-                    // TODO EOFException == closed socket on other end, close gracefully
-                    System.out.println(in.readUTF());
-                    server.close();
-                } catch (EOFException e) {
-                    peers.remove(server);
-                    System.out.println("Connection severed");
-                }
-            } catch (SocketException e) {
-                System.out.println("Cya");
-                break;
-            } catch (IOException e) {
-                e.printStackTrace();
-                break;
+                Thread t2 = new ChatPeerServer(server);
+                t2.start();
+            }
+            catch (IOException e) {
+                //peers.remove(server);
+                continue;
+                //System.out.println("  ");
             }
         }
     }
@@ -47,7 +38,6 @@ public class ChatMain extends Thread {
         int listenerPort, connectionId;
         String commandOne, userInput;
         BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
-//      while ((userInput = stdIn.readLine()) != null) {
         if (args.length != 1) {
             System.err.println("Usage: ChatMain < Listening Port >");
             System.exit(1);
@@ -101,18 +91,30 @@ public class ChatMain extends Thread {
                             String testHostname = commandArr[1];
                             InetAddress serverAddr = InetAddress.getByName(testHostname);
                             // TODO DELETE Thread t2 = ClientRunner(testHostname, commandArr[2]);
-                            try{
-                            Socket client = new Socket(serverAddr, Integer.parseInt(commandArr[2]));
-                            if (client.isConnected()) {
-                                System.out.println("Cool, connected now");
-                                peers.add(client);
-                                break;
-                            } else {
-                                System.out.println("Not connected, try again....");
-                                break;
-                            }
-                            } catch (UnknownHostException e){
+                            try {
+                                Socket client = new Socket(serverAddr, Integer.parseInt(commandArr[2]));
+                                // TODO Maybe a new thread for the peer client, so when peer that was connected exits, we close sockets and remove socket from list.
+                                Thread t3 = new ChatPeerClient(client, Integer.parseInt(commandArr[2]));
+                                t3.start();
+                                if (client.isConnected()) {
+                                    System.out.println("Cool, connected now");
+                                    peers.add(client);
+                                    peerPorts.add(Integer.parseInt(commandArr[2]));
+                                    byte port = (byte) listenerPort;
+                                    DataOutputStream outputStreamer = new DataOutputStream(client.getOutputStream());
+                                    outputStreamer.writeInt(listenerPort);
+                                    outputStreamers.add(outputStreamer);
+                                    //outputStreamer.close();
+                                    continue;
+                                } else {
+                                    System.out.println("Not connected, try again....");
+                                    break;
+                                }
+                            } catch (UnknownHostException e) {
                                 System.err.println("Don't know the host: " + testHostname + ". Try again");
+                                break;
+                            } catch (IOException e){
+                                System.out.println("Server's Closed");
                                 break;
                             }
                         }
@@ -121,31 +123,42 @@ public class ChatMain extends Thread {
                      */
                     case "list":
                         System.out.println("Connection ID   ||  IP Address  ||  Ports");
-                        for (int i = 0; i < peers.size(); i++){
-                            System.out.println(i + "    ||    " + peers.get(i).getInetAddress() + "    ||    " + peers.get(i).getPort());
+                        for (int i = 0; i < peers.size(); i++) {
+                            String[] addressSock = peers.get(i).getInetAddress().toString().split("\\/");
+                            System.out.println(i + "    ||    " + addressSock[1] + "    ||    " + peerPorts.get(i));
                         }
                         break;
                     case "terminate":
                         // TODO check if connection id exists
-                        if (commandArr.length != 2){
+                        if (commandArr.length != 2) {
                             System.err.println("Too few, or too many arguments");
                             System.out.println("Correct usage: terminate <connection id>");
                         }
                         try {
                             int terminateId = Integer.parseInt(commandArr[1]);
-                            if (!peers.get(terminateId).equals(null)){
+                            if (!peers.get(terminateId).equals(null)) {
                                 System.out.println("Disconnecting from: " + peers.get(terminateId).getInetAddress() + " on port: " + peers.get(terminateId).getPort());
+                                //outputStreamers.get(terminateId).writeUTF("SHUT OFF");
                                 peers.get(terminateId).close();
-                                peers.remove(terminateId);
-                            } else{
+                                if (peers.get(terminateId).isClosed()) {
+                                    System.out.println("Successfully closed");
+                                    outputStreamers.remove(terminateId);
+                                    peerPorts.remove((Integer) peers.get(terminateId).getPort());
+                                    peers.remove(terminateId);
+                                    break;
+                                } else {
+                                    System.out.println("NOPE NOT CLOSED");
+                                }
+                            } else {
                                 System.err.println("Connection ID specified not found");
                                 break;
                             }
-                        } catch (NumberFormatException e){
+                        } catch (NumberFormatException e) {
                             System.err.println(commandArr[1] + " was not a valid number, try again");
                             break;
-                        } catch (IndexOutOfBoundsException e){
+                        } catch (IndexOutOfBoundsException e) {
                             System.err.println("Index out of bounds query, try again.");
+
                             break;
                         }
                         break;
@@ -171,6 +184,7 @@ public class ChatMain extends Thread {
                                 // TODO send finMessage to specified socket peers.get(sendId)
                                 System.out.println("Sending Message to IP" + peers.get(sendId).getInetAddress() + " on port: " + peers.get(sendId).getPort());
                                 String finMessage = String.join(" ", messageArr);
+                                outputStreamers.get(sendId).writeUTF(finMessage);
                                 System.out.println(finMessage);
                             } catch (NumberFormatException e) {
                                 System.out.println(commandArr[1] + " was not a valid number");
@@ -181,9 +195,15 @@ public class ChatMain extends Thread {
 
                         break;
                     case "exit":
+                        for (int i = 0; i < peers.size(); i++){
+                            peers.get(i).close();
+                        }
                         theServer.close();
                         System.out.println("So long!");
                         System.exit(1);
+                    case "print":
+                        System.out.println(peerPorts.size());
+                        break;
                     default:
                         System.out.println("Not a command, type help to view a list of available commands");
                 }
@@ -192,6 +212,60 @@ public class ChatMain extends Thread {
             System.out.println(args[0] + " was not a valid number");
             System.err.println("Usage: ChatMain <Listening Port>");
             System.exit(1);
+        }
+    }
+}
+/*
+ * New thread that gets created whenever a socket connects to the listening server.
+ *
+ *
+ */
+class ChatPeerServer extends Thread {
+    Socket peerSocket;
+    int peerPort;
+
+    ChatPeerServer(Socket peerSocket) {
+        this.peerSocket = peerSocket;
+    }
+
+    public void run() {
+        try {
+            peerSocket.setSoTimeout(0);
+            System.out.println("Connection detected from... " + peerSocket.getRemoteSocketAddress());
+            // DEBUG
+            // int length = inputStreamer.readInt();
+            System.out.println("server addr: " + peerSocket.getInetAddress().getHostAddress());
+            System.out.println("port: " + peerSocket.getPort());
+            // DEBUG
+            // System.out.println("test1" + peerSocket.getInetAddress().getCanonicalHostName());
+            // DEBUG
+            // System.out.println("Other: " + peerSocket.getInetAddress().toString());
+            ChatMain.peers.add(peerSocket);
+            try {
+                DataInputStream inputStreamer = new DataInputStream(peerSocket.getInputStream());
+                peerPort = inputStreamer.readInt();
+                System.out.println("read port: " + peerPort);
+                ChatMain.peerPorts.add(peerPort);
+
+
+                while (true) {
+                    System.out.println(inputStreamer.readUTF());
+                    continue;
+                }
+            } catch (EOFException e) {
+                ChatMain.peers.remove(peerSocket);
+                ChatMain.peerPorts.remove(peerPort);
+                System.out.println("Connection severed");
+            } catch (SocketException e) {
+                System.out.println("SOCKET EXCEPTION");
+                ChatMain.peers.remove(peerSocket);
+                ChatMain.peerPorts.remove(peerPort);
+            }
+        } catch (Exception e) {
+            // ChatMain.peerPorts.remove(peerPort);
+            ChatMain.peerPorts.remove((Integer) peerPort);
+            ChatMain.peers.remove(peerSocket);
+            //System.out.println("  ");
         }
     }
 }

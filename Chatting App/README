@@ -1,9 +1,10 @@
 Work in progress.
+DONE:
+    Send message through socket
+    Keep track of peer's listening ports
+    Get IP Address
 TODO:
-    Figure out how to delete connection from peer list when disconnected
-    Send the message through the socket
-    Check if IP is working
-        If not, find a way of getting the right IP Address
+    Figure out how to delete connection from peer list when disconnected 'server' side
     Documentation
     ???
 
