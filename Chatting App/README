@@ -3,8 +3,9 @@ DONE:
     Send message through socket
     Keep track of peer's listening ports
     Get IP Address
-TODO:
     Figure out how to delete connection from peer list when disconnected 'server' side
+TODO:
+    Exception Handling?
     Documentation
     ???
 
