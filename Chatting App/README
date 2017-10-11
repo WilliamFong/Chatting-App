@@ -4,9 +4,9 @@ DONE:
     Keep track of peer's listening ports
     Get IP Address
     Figure out how to delete connection from peer list when disconnected 'server' side
+    Exception Handling
+
 TODO:
-    Exception Handling?
-    Documentation
     ???
 
 To run:

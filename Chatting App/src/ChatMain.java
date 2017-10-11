@@ -71,39 +71,44 @@ public class ChatMain extends Thread {
                         break;
                     }
                     case "connect": {
-                        if (commandArr.length > 3) {
-                            System.out.println("Too many arguments");
-                            System.out.println("connect <destination> <port number>");
-                            break;
-                        } else if (commandArr.length < 3) {
-                            System.out.println("Too few arguments");
-                            System.out.println("connect <destination> <port number>");
-                            break;
-                        } else {
-                            // TODO hostname verification......
-                            String testHostname = commandArr[1];
-                            InetAddress serverAddr = InetAddress.getByName(testHostname);
-                            try {
-                                Socket client = new Socket(serverAddr, Integer.parseInt(commandArr[2]));
-                                if (client.isConnected()) {
-                                    Thread t3 = new ChatPeerClient(client, listenerPort);
-                                    t3.start();
-                                    continue;
-                                } else {
-                                    System.out.println("Not connected, try again....");
+                        try {
+                            int portNumber = Integer.parseInt(commandArr[2]);
+                            if (commandArr.length != 3) {
+                                System.out.println("Too many arguments");
+                                System.out.println("connect <destination> <port number>");
+                                break;
+                            } else if (portNumber == listenerPort) {
+                                System.out.println("Cannot connect to own process");
+                                break;
+                            } else {
+                                // TODO hostname verification......
+                                String testHostname = commandArr[1];
+                                InetAddress serverAddr = InetAddress.getByName(testHostname);
+                                try {
+                                    Socket client = new Socket(serverAddr, Integer.parseInt(commandArr[2]));
+                                    if (client.isConnected()) {
+                                        Thread t3 = new ChatPeerClient(client, listenerPort);
+                                        t3.start();
+                                        continue;
+                                    } else {
+                                        System.out.println("Not connected, try again....");
+                                        break;
+                                    }
+                                } catch (UnknownHostException e) {
+                                    System.err.println("Don't know the host: " + testHostname + ". Try again");
+                                    break;
+                                } catch (IOException e) {
+                                    System.out.println("Server is closed");
                                     break;
                                 }
-                            } catch (UnknownHostException e) {
-                                System.err.println("Don't know the host: " + testHostname + ". Try again");
-                                break;
-                            } catch (IOException e) {
-                                System.out.println("Server is closed");
-                                break;
                             }
+                        } catch (NumberFormatException e) {
+                            System.out.println("Given port number was not valid");
+                            break;
                         }
                     }
                     case "list": {
-                        if (peers.size() == 0){
+                        if (peers.size() == 0) {
                             System.out.println("No Connections Found");
                         } else {
                             System.out.println("Connection ID   ||  IP Address  ||  Ports");
@@ -128,9 +133,9 @@ public class ChatMain extends Thread {
                                 peers.get(terminateId).close();
                                 if (peers.get(terminateId).isClosed()) {
                                     System.out.println("Successfully closed");
-                                    outputStreamers.remove(terminateId);
-                                    peerPorts.remove((Integer) peers.get(terminateId).getPort());
-                                    peers.remove(terminateId);
+                                    //outputStreamers.remove(terminateId);
+                                    //peerPorts.remove((Integer) peers.get(terminateId).getPort());
+                                    //peers.remove(terminateId);
                                 } else {
                                     System.out.println("NOPE NOT CLOSED");
                                 }
@@ -298,11 +303,11 @@ class ChatPeerServer extends Thread {
             }
         }
         /* All Encompassing Exception, might have to shoot different warnings based on what happens??
-         * */
-        catch (Exception e) {
-            System.out.println("Something happened with the connection from " + peerSocket.getInetAddress() + " port: " + peerPort + "\nDisconnecting...");
+         * */ catch (Exception e) {
+
             int removeNum = ChatMain.peerPorts.indexOf(peerPort);
-            ChatMain.peerPorts.remove(removeNum);
+            System.out.println("Something happened with the connection from " + peerSocket.getInetAddress() + " port: " + peerPort + "\nDisconnecting...");
+            ChatMain.peerPorts.remove(Integer.valueOf(peerPort));
             try {
                 ChatMain.peerChecker(peerPort);
                 ChatMain.outputStreamers.get(removeNum).close();
